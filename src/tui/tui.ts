@@ -21,7 +21,7 @@ import { GatewayChatClient } from "./gateway-chat.js";
 import { editorTheme, theme } from "./theme/theme.js";
 import { createCommandHandlers } from "./tui-command-handlers.js";
 import { createEventHandlers } from "./tui-event-handlers.js";
-import { formatTokens } from "./tui-formatters.js";
+import { getTokenUsageInfo } from "./tui-formatters.js";
 import { buildWaitingStatusMessage, defaultWaitingPhrases } from "./tui-waiting.js";
 import { createOverlayHandlers } from "./tui-overlays.js";
 import { createSessionActions } from "./tui-session-actions.js";
@@ -430,17 +430,29 @@ export async function runTui(opts: TuiOptions) {
         ? `${sessionInfo.modelProvider}/${sessionInfo.model}`
         : sessionInfo.model
       : "unknown";
-    const tokens = formatTokens(sessionInfo.totalTokens ?? null, sessionInfo.contextTokens ?? null);
+    const tokensInfo = getTokenUsageInfo(
+      sessionInfo.totalTokens ?? null,
+      sessionInfo.contextTokens ?? null,
+    );
     const think = sessionInfo.thinkingLevel ?? "off";
     const verbose = sessionInfo.verboseLevel ?? "off";
     const reasoning = sessionInfo.reasoningLevel ?? "off";
     const reasoningLabel =
       reasoning === "on" ? "reasoning" : reasoning === "stream" ? "reasoning:stream" : null;
-    footer.setText(
-      theme.dim(
-        `agent ${agentLabel} | session ${sessionLabel} | ${modelLabel} | think ${think} | verbose ${verbose}${reasoningLabel ? ` | ${reasoningLabel}` : ""} | ${tokens}`,
-      ),
+
+    const tokensColored = (() => {
+      const remaining = tokensInfo.pctRemaining;
+      if (remaining == null) return theme.dim(tokensInfo.text);
+      if (remaining <= 10) return theme.error(tokensInfo.text);
+      if (remaining <= 30) return theme.accentSoft(tokensInfo.text);
+      return theme.success(tokensInfo.text);
+    })();
+
+    const left = theme.dim(
+      `agent ${agentLabel} | session ${sessionLabel} | ${modelLabel} | think ${think} | verbose ${verbose}${reasoningLabel ? ` | ${reasoningLabel}` : ""} | `,
     );
+
+    footer.setText(`${left}${tokensColored}`);
   };
 
   const { openOverlay, closeOverlay } = createOverlayHandlers(tui, editor);

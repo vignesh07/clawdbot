@@ -140,15 +140,36 @@ export function extractTextFromMessage(
   return formatRawAssistantErrorForUi(errorMessage);
 }
 
-export function formatTokens(total?: number | null, context?: number | null) {
-  if (total == null && context == null) return "tokens ?";
+export function getTokenUsageInfo(
+  total?: number | null,
+  context?: number | null,
+): {
+  text: string;
+  pctUsed: number | null; // 0-999
+  pctRemaining: number | null; // 0-100
+} {
+  if (total == null && context == null) {
+    return { text: "tokens ?", pctUsed: null, pctRemaining: null };
+  }
+
   const totalLabel = total == null ? "?" : formatTokenCount(total);
-  if (context == null) return `tokens ${totalLabel}`;
-  const pct =
+  if (context == null) {
+    return { text: `tokens ${totalLabel}`, pctUsed: null, pctRemaining: null };
+  }
+
+  const pctUsed =
     typeof total === "number" && context > 0
       ? Math.min(999, Math.round((total / context) * 100))
       : null;
-  return `tokens ${totalLabel}/${formatTokenCount(context)}${pct !== null ? ` (${pct}%)` : ""}`;
+  const pctRemaining =
+    pctUsed != null && pctUsed <= 100 ? Math.max(0, 100 - pctUsed) : pctUsed != null ? 0 : null;
+
+  const text = `tokens ${totalLabel}/${formatTokenCount(context)}${pctUsed !== null ? ` (${pctUsed}%)` : ""}`;
+  return { text, pctUsed, pctRemaining };
+}
+
+export function formatTokens(total?: number | null, context?: number | null) {
+  return getTokenUsageInfo(total, context).text;
 }
 
 export function formatContextUsageLine(params: {
